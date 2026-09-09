@@ -193,7 +193,8 @@ export const variantCount = (topic: NotificationTopic): number => {
   return p.openers.length * p.bodies.length * p.closers.length;
 };
 
-export const totalVariants = (): number => variantCount("mining") + variantCount("ai");
+export const totalVariants = (): number =>
+  variantCount("mining") + variantCount("ai") + variantCount("crash");
 
 /** Removes emoji / pictographs and tidies the leftover spacing. */
 const stripEmoji = (s: string): string =>
