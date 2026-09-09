@@ -331,6 +331,35 @@ export type Database = {
           },
         ]
       }
+      crash_notification_log: {
+        Row: {
+          created_at: string
+          last_sent_at: string
+          profile_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          last_sent_at?: string
+          profile_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          last_sent_at?: string
+          profile_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crash_notification_log_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       game_bets: {
         Row: {
           created_at: string
@@ -446,7 +475,10 @@ export type Database = {
           ends_at: string
           id: string
           reward_amount: number | null
+          siri_reward: number
           started_at: string
+          ton_reward: number
+          usdt_reward: number
           user_id: string
         }
         Insert: {
@@ -455,7 +487,10 @@ export type Database = {
           ends_at: string
           id?: string
           reward_amount?: number | null
+          siri_reward?: number
           started_at?: string
+          ton_reward?: number
+          usdt_reward?: number
           user_id: string
         }
         Update: {
@@ -464,7 +499,10 @@ export type Database = {
           ends_at?: string
           id?: string
           reward_amount?: number | null
+          siri_reward?: number
           started_at?: string
+          ton_reward?: number
+          usdt_reward?: number
           user_id?: string
         }
         Relationships: [
