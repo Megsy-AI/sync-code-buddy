@@ -3,7 +3,7 @@
 // ai:     20 x 18 x 16 = 5760 variants
 // Total unique texts: 12,800+
 
-export type NotificationTopic = "mining" | "ai";
+export type NotificationTopic = "mining" | "ai" | "crash";
 
 const MINING_OPENERS = [
   "⛏️ {name}, your rig is sitting idle.",
