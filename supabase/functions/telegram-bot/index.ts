@@ -34,6 +34,14 @@ serve(async (req) => {
       });
     }
 
+    // Scheduled crash-game highlights (every few hours).
+    if (body?.task === 'crash_notify') {
+      const result = await runCrashNotifications(supabase, BASE_URL, Number(body?.limit ?? 3000));
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // AI-personalised purchase offer, hosted here for the same reason.
     if (body?.task === 'smart_offer') {
       const result = await buildSmartOffer(
