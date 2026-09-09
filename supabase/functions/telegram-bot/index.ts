@@ -34,6 +34,14 @@ serve(async (req) => {
       });
     }
 
+    // Scheduled crash-game highlights (every few hours).
+    if (body?.task === 'crash_notify') {
+      const result = await runCrashNotifications(supabase, BASE_URL, Number(body?.limit ?? 3000));
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // AI-personalised purchase offer, hosted here for the same reason.
     if (body?.task === 'smart_offer') {
       const result = await buildSmartOffer(
@@ -659,7 +667,7 @@ serve(async (req) => {
         }
 
         // Get welcome image from admin config (falls back to default Nova banner)
-        const DEFAULT_WELCOME_IMAGE = 'https://ltgampdtawuefwwayncx.supabase.co/storage/v1/object/public/user-images/nova/welcome-start.jpg';
+        const DEFAULT_WELCOME_IMAGE = 'https://project--10a457f9-1071-441f-805e-a0a86ff9071a-dev.lovable.app/__l5e/assets-v1/9450cef6-cded-48d0-b9c7-169d6965a5b0/prize-10000-banner.jpg';
         let welcomeImageUrl = DEFAULT_WELCOME_IMAGE;
         try {
           const { data: adminConfig } = await supabase
@@ -714,11 +722,10 @@ serve(async (req) => {
         }
 
         // Every player gets the $10,000 prize once, live for 48 hours.
+        // The prize photo itself is delivered a few minutes after signup by the
+        // per-minute broadcast worker, so the first /start stays clean.
         try {
-          const { data: prize } = await supabase.rpc('grant_welcome_prize', { _telegram_id: userId });
-          if (prize?.granted) {
-            await sendPrizeMessage(BASE_URL, chatId, firstName);
-          }
+          await supabase.rpc('grant_welcome_prize', { _telegram_id: userId });
         } catch (prizeError) {
           console.error("Failed to grant welcome prize:", prizeError);
         }
@@ -951,7 +958,7 @@ async function runAutoNotifications(supabase: any, BASE_URL: string) {
 
 // ---------- $10,000 welcome prize ----------
 export const PRIZE_IMAGE_URL =
-  'https://ltgampdtawuefwwayncx.supabase.co/storage/v1/object/public/user-images/nova/prize-10000-nova.jpg';
+  'https://project--10a457f9-1071-441f-805e-a0a86ff9071a-dev.lovable.app/__l5e/assets-v1/9450cef6-cded-48d0-b9c7-169d6965a5b0/prize-10000-banner.jpg';
 
 export const prizeCaption = (name: string) => {
   const safe = (name || 'Player').replace(/[<>&]/g, '');
@@ -1058,4 +1065,93 @@ async function startPrizeRound(supabase: any) {
   await supabase.from('prize_broadcast_log').delete().gte('sent_at', '1970-01-01');
 
   return { ok: true, round: 'started', granted: grant?.granted ?? 0 };
+}
+
+// ── Automated crash-game notifications ──────────────────────────────────────
+const CRASH_COOLDOWN_HOURS = 6;
+async function runCrashNotifications(supabase: any, BASE_URL: string, limit: number) {
+  const cooldownIso = new Date(Date.now() - CRASH_COOLDOWN_HOURS * 3600_000).toISOString();
+
+  const { data: rounds } = await supabase
+    .from('game_crash_rounds')
+    .select('round_id, crash_multiplier')
+    .order('round_id', { ascending: false })
+    .limit(20);
+
+  const list = rounds ?? [];
+  if (list.length === 0) return { ok: true, skipped: 'no_rounds' };
+
+  const best = list.reduce(
+    (a: any, b: any) => (Number(b.crash_multiplier) > Number(a.crash_multiplier) ? b : a),
+    list[0],
+  );
+  const history = list
+    .slice(0, 8)
+    .map((r: any) => `${Number(r.crash_multiplier).toFixed(2)}x`)
+    .join('  •  ');
+
+  const { data: recent } = await supabase
+    .from('crash_notification_log')
+    .select('profile_id')
+    .gt('last_sent_at', cooldownIso);
+  const recentlySent = new Set((recent || []).map((r: any) => r.profile_id));
+
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, telegram_id, first_name')
+    .eq('is_banned', false)
+    .limit(Math.min(Math.max(limit, 1), 5000));
+
+  const targets = (profiles || []).filter((p: any) => p.telegram_id && !recentlySent.has(p.id));
+
+  let sent = 0;
+  let failed = 0;
+  const CHUNK = 25;
+
+  for (let i = 0; i < targets.length; i += CHUNK) {
+    const chunk = targets.slice(i, i + CHUNK);
+    const okRows: { profile_id: string; last_sent_at: string; updated_at: string }[] = [];
+
+    await Promise.all(
+      chunk.map(async (p: any) => {
+        const safe = String(p.first_name || 'Player').replace(/[<>&]/g, '').slice(0, 32);
+        const text =
+          `<b>${safe}, the Crash table is hot right now.</b>\n\n` +
+          `<b>Top multiplier: ${Number(best.crash_multiplier).toFixed(2)}x</b>\n` +
+          `<b>Last rounds: ${history}</b>\n\n` +
+          `<b>Place a TON bet, watch the curve and cash out before it crashes.</b>`;
+        try {
+          const res = await fetch(`${BASE_URL}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: p.telegram_id,
+              text,
+              parse_mode: 'HTML',
+              disable_web_page_preview: true,
+              reply_markup: { inline_keyboard: [[{ text: 'Play Crash', url: APP_URL }]] },
+            }),
+          });
+          const json = await res.json();
+          if (json.ok) {
+            okRows.push({
+              profile_id: p.id,
+              last_sent_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+          } else failed++;
+        } catch {
+          failed++;
+        }
+      }),
+    );
+
+    if (okRows.length) {
+      await supabase.from('crash_notification_log').upsert(okRows, { onConflict: 'profile_id' });
+      sent += okRows.length;
+    }
+    if (i + CHUNK < targets.length) await new Promise((r) => setTimeout(r, 1100));
+  }
+
+  return { ok: true, candidates: targets.length, sent, failed, best: best.crash_multiplier };
 }
