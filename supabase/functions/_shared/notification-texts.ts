@@ -135,9 +135,57 @@ const AI_CLOSERS = [
   "Tap to chat with Nova. 💬",
 ];
 
+const CRASH_OPENERS = [
+  "🚀 {name}, the rocket is climbing again.",
+  "📈 {name}, a new Crash round just started.",
+  "🔥 {name}, someone cashed out big minutes ago.",
+  "🎯 {name}, think you can beat the last multiplier?",
+  "💥 {name}, the last round crashed early — the next one won't.",
+  "⚡ {name}, one tap, one round, instant result.",
+  "🏆 {name}, the Crash leaderboard is moving.",
+  "🎰 {name}, Crash is live right now.",
+  "🌙 {name}, quick round before you sleep?",
+  "💎 {name}, big multipliers are hitting today.",
+  "🕹️ {name}, your seat at Crash is open.",
+  "📊 {name}, the multiplier hit 500x range today.",
+  "🎲 {name}, feeling lucky this round?",
+  "🚨 {name}, don't miss the next takeoff.",
+  "🪙 {name}, turn a small stake into a big cashout.",
+  "⏱️ {name}, rounds last seconds — jump in.",
+];
+
+const CRASH_BODIES = [
+  "Place a stake, watch the multiplier rise, cash out before it crashes.",
+  "Multipliers can reach up to 500x — timing is everything.",
+  "Most rounds end early, so a smart cashout beats greed.",
+  "Small stakes, fast rounds, instant payouts to your balance.",
+  "Your Gram balance works here — no deposits needed to try.",
+  "Set your target multiplier and let the round run.",
+  "Every round is provably generated and settled server-side.",
+  "Cash out at 2x consistently and the balance climbs.",
+  "One brave round could multiply your stake many times over.",
+  "The history panel shows every recent multiplier before you bet.",
+  "Play a few rounds while your mining session runs.",
+  "Wins are credited to your balance the second you cash out.",
+];
+
+const CRASH_CLOSERS = [
+  "Open Crash now. 🚀",
+  "Tap to play a round. 🎮",
+  "Your next cashout is waiting. 💰",
+  "Jump into the round. ⚡",
+  "Try one round. 🎯",
+  "Cash out in time. ⏱️",
+  "Let's fly. 🛫",
+  "Play Crash now. 🔥",
+  "Beat your best multiplier. 🏅",
+  "Good luck out there. 🍀",
+];
+
 const POOLS: Record<NotificationTopic, { openers: string[]; bodies: string[]; closers: string[] }> = {
   mining: { openers: MINING_OPENERS, bodies: MINING_BODIES, closers: MINING_CLOSERS },
   ai: { openers: AI_OPENERS, bodies: AI_BODIES, closers: AI_CLOSERS },
+  crash: { openers: CRASH_OPENERS, bodies: CRASH_BODIES, closers: CRASH_CLOSERS },
 };
 
 export const variantCount = (topic: NotificationTopic): number => {
