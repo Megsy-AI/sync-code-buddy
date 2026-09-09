@@ -1066,3 +1066,92 @@ async function startPrizeRound(supabase: any) {
 
   return { ok: true, round: 'started', granted: grant?.granted ?? 0 };
 }
+
+// ── Automated crash-game notifications ──────────────────────────────────────
+const CRASH_COOLDOWN_HOURS = 6;
+async function runCrashNotifications(supabase: any, BASE_URL: string, limit: number) {
+  const cooldownIso = new Date(Date.now() - CRASH_COOLDOWN_HOURS * 3600_000).toISOString();
+
+  const { data: rounds } = await supabase
+    .from('game_crash_rounds')
+    .select('round_id, crash_multiplier')
+    .order('round_id', { ascending: false })
+    .limit(20);
+
+  const list = rounds ?? [];
+  if (list.length === 0) return { ok: true, skipped: 'no_rounds' };
+
+  const best = list.reduce(
+    (a: any, b: any) => (Number(b.crash_multiplier) > Number(a.crash_multiplier) ? b : a),
+    list[0],
+  );
+  const history = list
+    .slice(0, 8)
+    .map((r: any) => `${Number(r.crash_multiplier).toFixed(2)}x`)
+    .join('  •  ');
+
+  const { data: recent } = await supabase
+    .from('crash_notification_log')
+    .select('profile_id')
+    .gt('last_sent_at', cooldownIso);
+  const recentlySent = new Set((recent || []).map((r: any) => r.profile_id));
+
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, telegram_id, first_name')
+    .eq('is_banned', false)
+    .limit(Math.min(Math.max(limit, 1), 5000));
+
+  const targets = (profiles || []).filter((p: any) => p.telegram_id && !recentlySent.has(p.id));
+
+  let sent = 0;
+  let failed = 0;
+  const CHUNK = 25;
+
+  for (let i = 0; i < targets.length; i += CHUNK) {
+    const chunk = targets.slice(i, i + CHUNK);
+    const okRows: { profile_id: string; last_sent_at: string; updated_at: string }[] = [];
+
+    await Promise.all(
+      chunk.map(async (p: any) => {
+        const safe = String(p.first_name || 'Player').replace(/[<>&]/g, '').slice(0, 32);
+        const text =
+          `<b>${safe}, the Crash table is hot right now.</b>\n\n` +
+          `<b>Top multiplier: ${Number(best.crash_multiplier).toFixed(2)}x</b>\n` +
+          `<b>Last rounds: ${history}</b>\n\n` +
+          `<b>Place a TON bet, watch the curve and cash out before it crashes.</b>`;
+        try {
+          const res = await fetch(`${BASE_URL}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: p.telegram_id,
+              text,
+              parse_mode: 'HTML',
+              disable_web_page_preview: true,
+              reply_markup: { inline_keyboard: [[{ text: 'Play Crash', url: APP_URL }]] },
+            }),
+          });
+          const json = await res.json();
+          if (json.ok) {
+            okRows.push({
+              profile_id: p.id,
+              last_sent_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+          } else failed++;
+        } catch {
+          failed++;
+        }
+      }),
+    );
+
+    if (okRows.length) {
+      await supabase.from('crash_notification_log').upsert(okRows, { onConflict: 'profile_id' });
+      sent += okRows.length;
+    }
+    if (i + CHUNK < targets.length) await new Promise((r) => setTimeout(r, 1100));
+  }
+
+  return { ok: true, candidates: targets.length, sent, failed, best: best.crash_multiplier };
+}
