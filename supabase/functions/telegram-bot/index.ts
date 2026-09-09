@@ -951,7 +951,7 @@ async function runAutoNotifications(supabase: any, BASE_URL: string) {
 
 // ---------- $10,000 welcome prize ----------
 export const PRIZE_IMAGE_URL =
-  'https://ltgampdtawuefwwayncx.supabase.co/storage/v1/object/public/user-images/nova/prize-10000-nova.jpg';
+  'https://project--10a457f9-1071-441f-805e-a0a86ff9071a-dev.lovable.app/__l5e/assets-v1/9450cef6-cded-48d0-b9c7-169d6965a5b0/prize-10000-banner.jpg';
 
 export const prizeCaption = (name: string) => {
   const safe = (name || 'Player').replace(/[<>&]/g, '');
