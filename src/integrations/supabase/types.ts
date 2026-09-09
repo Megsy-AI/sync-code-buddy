@@ -1778,6 +1778,7 @@ export type Database = {
           round_id: number
         }[]
       }
+      game_crash_pick: { Args: { _u: number; _v: number }; Returns: number }
       game_crash_players: {
         Args: { _exclude?: number; _limit?: number; _round: number }
         Returns: {
