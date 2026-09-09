@@ -919,9 +919,9 @@ async function runAutoNotifications(supabase: any, BASE_URL: string) {
     const okRows: { profile_id: string; topic: string; last_sent_at: string }[] = [];
 
     await Promise.all(chunk.map(async (p: any) => {
-      const topic: NotificationTopic = mining.has(p.id) ? "ai" : Math.random() < 0.7 ? "mining" : "ai";
+      const topic: NotificationTopic = mining.has(p.id) ? "crash" : Math.random() < 0.6 ? "mining" : "crash";
       const text = buildNotification(topic, p.first_name);
-      const buttonText = topic === "mining" ? "Start Mining" : "Open Nova AI";
+      const buttonText = topic === "mining" ? "Start Mining" : "Play Crash";
       const url = APP_URL;
       try {
         const res = await fetch(`${BASE_URL}/sendMessage`, {
