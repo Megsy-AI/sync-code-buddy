@@ -1014,6 +1014,7 @@ export type Database = {
           duration_days: number
           early_exit_fee_pct: number
           ends_at: string
+          funded_amount: number
           id: string
           last_claim_at: string
           plan_id: string
@@ -1032,6 +1033,7 @@ export type Database = {
           duration_days: number
           early_exit_fee_pct?: number
           ends_at: string
+          funded_amount: number
           id?: string
           last_claim_at?: string
           plan_id: string
@@ -1050,6 +1052,7 @@ export type Database = {
           duration_days?: number
           early_exit_fee_pct?: number
           ends_at?: string
+          funded_amount?: number
           id?: string
           last_claim_at?: string
           plan_id?: string
@@ -1068,6 +1071,53 @@ export type Database = {
           },
           {
             foreignKeyName: "stakes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staking_personal_offers: {
+        Row: {
+          created_at: string
+          currency: string
+          expires_at: string
+          id: string
+          is_active: boolean
+          message_sent_at: string | null
+          multiplier: number
+          profile_id: string
+          starts_at: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          expires_at: string
+          id?: string
+          is_active?: boolean
+          message_sent_at?: string | null
+          multiplier?: number
+          profile_id: string
+          starts_at?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          expires_at?: string
+          id?: string
+          is_active?: boolean
+          message_sent_at?: string | null
+          multiplier?: number
+          profile_id?: string
+          starts_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staking_personal_offers_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
