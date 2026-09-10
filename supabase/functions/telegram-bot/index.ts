@@ -971,47 +971,36 @@ export const PRIZE_IMAGE_URL =
 export const prizeCaption = (name: string) => {
   const safe = (name || 'Player').replace(/[<>&]/g, '');
   return (
-    `🏆 <b>${safe}, you won $10,000</b>\n\n` +
-    `Your Nova account has just been credited with <b>$10,000 USDT</b> — the Grand Prize of this round, ` +
-    `in partnership with <b>Google</b> &amp; <b>Alibaba</b>.\n\n` +
-    `💰 Prize: <b>$10,000 USDT</b>\n` +
-    `⏳ Valid for: <b>48 hours only</b>\n` +
-    `🏦 Where: <b>Wallet → Rewards</b>\n\n` +
-    `Open the app and claim it before the countdown ends — unclaimed rewards are removed automatically.`
+    `<b>${safe}, you won $10,000</b>\n\n` +
+    `Your Nova account has been credited with <b>$10,000 USDT</b>, the Grand Prize of this round, ` +
+    `in partnership with <b>Google</b> and <b>Alibaba</b>.\n\n` +
+    `Prize: <b>$10,000 USDT</b>\n` +
+    `Valid for: <b>48 hours only</b>\n` +
+    `Where: <b>Wallet, Rewards</b>\n\n` +
+    `Open the app and claim it before the countdown ends. Unclaimed rewards are removed automatically.`
   );
 };
 
 
 const prizeMarkup = {
-  inline_keyboard: [[{ text: '🎁 Claim my $10,000', url: APP_URL }]],
+  inline_keyboard: [[{ text: 'Claim my $10,000', url: APP_URL }]],
 };
 
+// Clean text-only delivery: no photo, no emoji, no icons.
 async function sendPrizeMessage(baseUrl: string, chatId: number, name: string) {
-  const res = await fetch(`${baseUrl}/sendPhoto`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      photo: PRIZE_IMAGE_URL,
-      caption: prizeCaption(name),
-      parse_mode: 'HTML',
-      reply_markup: prizeMarkup,
-    }),
-  });
-  const json = await res.json().catch(() => ({ ok: false }));
-  if (json?.ok) return true;
-  const fallback = await fetch(`${baseUrl}/sendMessage`, {
+  const res = await fetch(`${baseUrl}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       chat_id: chatId,
       text: prizeCaption(name),
       parse_mode: 'HTML',
+      disable_web_page_preview: true,
       reply_markup: prizeMarkup,
     }),
   });
-  const fj = await fallback.json().catch(() => ({ ok: false }));
-  return fj?.ok === true;
+  const json = await res.json().catch(() => ({ ok: false }));
+  return json?.ok === true;
 }
 
 const APEX_STAKING_IMAGE_URL =
