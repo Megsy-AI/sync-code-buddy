@@ -19,6 +19,7 @@ export interface StakeRecord {
   plan_name: string;
   currency: "ton" | "siri";
   amount: number;
+  funded_amount: number;
   apr: number;
   duration_days: number;
   early_exit_fee_pct: number;
@@ -30,11 +31,20 @@ export interface StakeRecord {
   status: "active" | "closed" | "early_closed";
 }
 
+export interface PersonalStakingOffer {
+  active: true;
+  multiplier: number;
+  starts_at: string;
+  expires_at: string;
+  currency: "ton";
+}
+
 export interface StakingOverview {
   success: boolean;
   plans: StakingPlan[];
   stakes: StakeRecord[];
   balances: { ton: number; siri: number } | null;
+  personal_offer: PersonalStakingOffer | null;
 }
 
 const rpc = async <T,>(fn: string, params: Record<string, unknown>): Promise<T> => {
@@ -47,7 +57,14 @@ export const getStakingOverview = (telegramId: number) =>
   rpc<StakingOverview>("staking_get_overview_for_telegram", { _telegram_id: telegramId });
 
 export const createStake = (telegramId: number, planId: string, amount: number) =>
-  rpc<{ success: boolean; error?: string; stake_id?: string }>("staking_create_for_telegram", {
+  rpc<{
+    success: boolean;
+    error?: string;
+    stake_id?: string;
+    funded_amount?: number;
+    credited_amount?: number;
+    multiplier?: number;
+  }>("staking_create_for_telegram", {
     _telegram_id: telegramId,
     _plan_id: planId,
     _amount: amount,

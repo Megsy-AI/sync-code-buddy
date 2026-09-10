@@ -24,6 +24,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useApp } from "@/context/AppContext";
 import { readCache, writeCache } from "@/lib/cache";
+import offerBanner from "@/assets/apex-double-stake-page.jpg.asset.json";
 import {
   STAKE_ERRORS,
   claimStakeYield,
@@ -32,6 +33,7 @@ import {
   unstake,
   type StakeRecord,
   type StakingPlan,
+  type PersonalStakingOffer,
 } from "@/lib/staking-api";
 
 const GRAM_ICON = "/images/gram-icon.png";
@@ -62,6 +64,16 @@ const progressPct = (s: StakeRecord) => {
 const estimate = (amount: number, apr: number, days: number) =>
   (amount || 0) * ((apr || 0) / 100) * ((days || 0) / 365);
 
+const offerTimeLeft = (iso?: string) => {
+  if (!iso) return null;
+  const seconds = Math.max(0, Math.floor((new Date(iso).getTime() - Date.now()) / 1000));
+  if (seconds <= 0) return null;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  return [hours, minutes, secs].map((part) => String(part).padStart(2, "0")).join(":");
+};
+
 const ease = [0.22, 1, 0.36, 1] as const;
 
 const StakingPage = () => {
@@ -70,6 +82,7 @@ const StakingPage = () => {
   const [tab, setTab] = useState<"plans" | "mine">("plans");
   const [plans, setPlans] = useState<StakingPlan[]>([]);
   const [stakes, setStakes] = useState<StakeRecord[]>([]);
+  const [personalOffer, setPersonalOffer] = useState<PersonalStakingOffer | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<StakingPlan | null>(null);
@@ -89,6 +102,7 @@ const StakingPage = () => {
       const res = await getStakingOverview(user.telegramUser.id);
       setPlans(res?.plans ?? []);
       setStakes(res?.stakes ?? []);
+      setPersonalOffer(res?.personal_offer ?? null);
       writeCache("staking-plans", res?.plans ?? []);
     } catch (e) {
       console.error("staking load failed", e);
@@ -103,11 +117,13 @@ const StakingPage = () => {
   }, [load]);
 
   useEffect(() => {
-    const t = setInterval(() => setTick((n) => n + 1), 30000);
+    const t = setInterval(() => setTick((n) => n + 1), 1000);
     return () => clearInterval(t);
   }, []);
 
   const active = useMemo(() => stakes.filter((s) => s.status === "active"), [stakes]);
+  const offerCountdown = offerTimeLeft(personalOffer?.expires_at);
+  const hasGramOffer = personalOffer?.currency === "ton" && offerCountdown !== null;
 
   const totals = useMemo(() => {
     const t = { ton: 0, siri: 0 };
@@ -158,8 +174,11 @@ const StakingPage = () => {
         return;
       }
       toast({
-        title: "Bond opened",
-        description: `${fmt(amt)} ${label(selected.currency)} locked for ${selected.duration_days} days`,
+        title: Number(res.multiplier) > 1 ? "Double investment activated" : "Bond opened",
+        description:
+          Number(res.multiplier) > 1
+            ? `${fmt(Number(res.funded_amount))} Gram paid · ${fmt(Number(res.credited_amount))} Gram invested`
+            : `${fmt(amt)} ${label(selected.currency)} locked for ${selected.duration_days} days`,
       });
       setSelected(null);
       await Promise.all([load(), refreshProfile()]);
@@ -219,6 +238,35 @@ const StakingPage = () => {
     <div className="pb-28">
       <SpotlightHero title="Bonds">
         <div className="px-5 pt-4">
+          {hasGramOffer && (
+            <motion.section
+              className="mb-5 overflow-hidden rounded-2xl border border-primary/40 bg-card"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.32, ease }}
+            >
+              <img
+                src={offerBanner.url}
+                alt="Exclusive double Gram staking offer"
+                width={1536}
+                height={896}
+                className="aspect-[12/7] w-full object-cover"
+              />
+              <div className="p-4 text-center">
+                <p className="text-xs font-semibold uppercase text-primary">Your private 2X Gram offer</p>
+                <p className="mt-1 text-sm leading-5 text-foreground">
+                  Pay any Gram amount and twice that amount will be invested. Pay 1,000 Gram, invest 2,000 Gram.
+                </p>
+                <div className="mt-4 border-t border-border pt-3">
+                  <p className="text-[10px] uppercase text-muted-foreground">Offer ends in</p>
+                  <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-foreground">
+                    {offerCountdown}
+                  </p>
+                </div>
+              </div>
+            </motion.section>
+          )}
+
           {/* Portfolio summary */}
           <motion.section
             className="rounded-3xl border border-border bg-card/50 p-5 backdrop-blur-xl"
@@ -271,7 +319,7 @@ const StakingPage = () => {
               {plans.length === 0 && (
                 <p className="py-12 text-center text-sm text-muted-foreground">No plans available</p>
               )}
-              {plans.map((p, i) => (
+               {plans.map((p, i) => (
                 <motion.button
                   key={p.id}
                   onClick={() => openPlan(p)}
@@ -293,6 +341,9 @@ const StakingPage = () => {
                         <p className="mt-0.5 text-[11px] text-muted-foreground">
                           {p.duration_days} days · min {fmt(p.min_amount, 2)} {label(p.currency)}
                         </p>
+                         {hasGramOffer && p.currency === "ton" && (
+                           <p className="mt-1 text-[11px] font-semibold text-primary">Your investment value is doubled</p>
+                         )}
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
@@ -453,12 +504,24 @@ const StakingPage = () => {
               className="h-12 rounded-2xl"
             />
             <div className="rounded-2xl border border-border bg-card/40 p-3 text-xs text-muted-foreground">
-              Estimated yield at maturity:{" "}
+               Estimated yield at maturity:{" "}
               <span className="font-display text-primary">
-                {fmt(estimate(amt, selected?.apr ?? 0, selected?.duration_days ?? 0))}{" "}
+                 {fmt(estimate(
+                   amt * (hasGramOffer && selected?.currency === "ton" ? Number(personalOffer?.multiplier ?? 1) : 1),
+                   selected?.apr ?? 0,
+                   selected?.duration_days ?? 0,
+                 ))}{" "}
                 {label(selected?.currency ?? "ton")}
               </span>
             </div>
+             {hasGramOffer && selected?.currency === "ton" && Number.isFinite(amt) && amt > 0 && (
+               <div className="rounded-2xl border border-primary/30 bg-primary/10 p-3 text-center">
+                 <p className="text-[10px] uppercase text-muted-foreground">You pay · Investment value</p>
+                 <p className="mt-1 font-display text-base text-foreground">
+                   {fmt(amt, 2)} Gram · {fmt(amt * Number(personalOffer?.multiplier ?? 2), 2)} Gram
+                 </p>
+               </div>
+             )}
             {invalidReason && <p className="text-xs text-destructive">{invalidReason}</p>}
             <Button
               onClick={() => void submit()}

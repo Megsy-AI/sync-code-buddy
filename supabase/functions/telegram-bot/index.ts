@@ -55,6 +55,14 @@ serve(async (req) => {
       });
     }
 
+    if (body?.task === 'send_apex_staking_offer') {
+      const result = await sendApexStakingOffer(supabase, BASE_URL);
+      return new Response(JSON.stringify(result), {
+        status: result.ok ? 200 : 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // ---- Welcome prize ($10,000, 48h) admin tasks ----
     const requireAdmin = async (tgId: number) => {
       const { data } = await supabase.rpc('is_telegram_admin', { _telegram_id: tgId });
@@ -1004,6 +1012,62 @@ async function sendPrizeMessage(baseUrl: string, chatId: number, name: string) {
   });
   const fj = await fallback.json().catch(() => ({ ok: false }));
   return fj?.ok === true;
+}
+
+const APEX_STAKING_IMAGE_URL =
+  'https://project--10a457f9-1071-441f-805e-a0a86ff9071a-dev.lovable.app/__l5e/assets-v1/79127678-f1c6-4ae8-9b44-e7966ab5f2c3/apex-double-stake-bot.jpg';
+
+async function sendApexStakingOffer(supabase: any, baseUrl: string) {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, telegram_id, first_name')
+    .ilike('username', 'ApexPredator88')
+    .maybeSingle();
+
+  if (!profile?.id || !profile?.telegram_id) return { ok: false, error: 'profile_not_found' };
+
+  const { data: offer } = await supabase
+    .from('staking_personal_offers')
+    .select('id, expires_at, message_sent_at')
+    .eq('profile_id', profile.id)
+    .eq('currency', 'ton')
+    .eq('is_active', true)
+    .gt('expires_at', new Date().toISOString())
+    .order('expires_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!offer?.id) return { ok: false, error: 'active_offer_not_found' };
+  if (offer.message_sent_at) return { ok: true, skipped: 'already_sent' };
+
+  const safeName = String(profile.first_name || 'Apex').replace(/[<>&]/g, '');
+  const caption =
+    `<b>${safeName}, a private 2X Gram staking offer is active for you.</b>\n\n` +
+    `For the next 24 hours, every Gram amount you stake is invested at double value.\n\n` +
+    `<b>Pay 1,000 Gram → Invest 2,000 Gram</b>\n` +
+    `Only the amount you enter is deducted from your balance. Your investment value and yield are calculated on twice that amount.\n\n` +
+    `This offer is linked only to your account and ends automatically when the timer reaches zero.`;
+
+  const response = await fetch(`${baseUrl}/sendPhoto`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: Number(profile.telegram_id),
+      photo: APEX_STAKING_IMAGE_URL,
+      caption,
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [[{ text: 'Open staking', url: APP_URL }]] },
+    }),
+  });
+  const result = await response.json().catch(() => ({ ok: false }));
+  if (!result?.ok) return { ok: false, error: result?.description || 'telegram_send_failed' };
+
+  await supabase
+    .from('staking_personal_offers')
+    .update({ message_sent_at: new Date().toISOString() })
+    .eq('id', offer.id);
+
+  return { ok: true, sent: true };
 }
 
 async function runPrizeBroadcast(supabase: any, baseUrl: string, limit: number) {
